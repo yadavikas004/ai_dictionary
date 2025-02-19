@@ -1,0 +1,84 @@
+/* SearchResults.css */
+
+body {
+  background-color: #f0f4f8; /* Light background color */
+  font-family: 'Arial', sans-serif;
+}
+
+.results-container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 20px;
+  border-radius: 10px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.word-title {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #333;
+}
+
+.section {
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+h3 {
+  font-size: 24px;
+  color: #007bff;
+  margin-bottom: 10px;
+}
+
+.meanings-list,
+.similar-words-list,
+.context-examples-list {
+  list-style-type: none;
+  padding: 0;
+}
+
+.meaning-item,
+.similar-word-item,
+.context-example-item {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  transition: background-color 0.3s;
+}
+
+.meaning-item:hover,
+.similar-word-item:hover,
+.context-example-item:hover {
+  background-color: #e9ecef; /* Highlight on hover */
+}
+
+.sentiment-section {
+  background-color: #e6ffed; /* Light green background */
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.sentiment-label {
+  font-size: 20px;
+  font-weight: bold;
+  color: #28a745; /* Green for positive sentiment */
+  display: inline-block;
+  padding: 5px 10px;
+  background-color: #d4edda; /* Light green background for label */
+  border-radius: 5px;
+}
+
+.sentiment-score {
+  font-size: 16px;
+  margin-top: 5px;
+}
+
+.loading {
+  text-align: center;
+  font-size: 18px;
+  color: #666;
+}
