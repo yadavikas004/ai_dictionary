@@ -10,6 +10,29 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import logging
 from nltk.corpus import wordnet
+import aiohttp
+from fastapi import HTTPException
+from app.services.ml_service import MLService
+from app.services.nltk_setup import ensure_nltk_data
+import sys
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# At the start of your file, after imports
+try:
+    ensure_nltk_data()
+except Exception as e:
+    logger.error(f"Failed to download NLTK data: {str(e)}")
+    raise
 
 # Load spaCy model
 nlp = spacy.load("en_core_web_sm")
@@ -24,11 +47,6 @@ generator = pipeline('text-generation', model='gpt2')
 # Initialize other tools
 lemmatizer = WordNetLemmatizer()
 
-# Download required NLTK data
-nltk.download('punkt')
-nltk.download('wordnet')
-nltk.download('averaged_perceptron_tagger')
-
 # Initialize models
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 bert_model = BertModel.from_pretrained('bert-base-uncased')
@@ -42,8 +60,39 @@ embedding_model = tf.keras.Sequential([
     tf.keras.layers.GlobalAveragePooling1D()
 ])
 
-# Initialize logger
-logger = logging.getLogger(__name__)
+DICTIONARY_API_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
+
+# Initialize ML Service
+ml_service = MLService()
+
+async def get_word_details(word: str) -> Dict:
+    """Fetch word details from the Free Dictionary API"""
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)  # 10 seconds timeout
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(DICTIONARY_API_URL.format(word=word)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data[0]  # Returns first entry
+                else:
+                    error_data = await response.text()
+                    logger.error(f"API Error: {error_data}")
+                    raise HTTPException(
+                        status_code=response.status,
+                        detail="Word not found or API error"
+                    )
+    except aiohttp.ClientError as e:
+        logger.error(f"Network error: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 def get_meaning(word: str) -> Dict:
     """Get comprehensive word analysis"""
@@ -194,13 +243,16 @@ def lemmatize_text(text: str) -> List[Tuple[str, str]]:
     
     return list(set(spacy_lemmas + nltk_lemmas))
 
-def get_word_analysis(word: str) -> Dict:
+async def get_word_analysis(word: str) -> Dict:
     """Get complete word analysis including meanings, POS, tokens, and lemmas"""
     text = word.strip().lower()
     
+    # Get word details asynchronously
+    word_details = await get_word_details(text)
+    
     return {
         "word": text,
-        "meanings": get_meaning(text)["meanings"],
+        "meanings": word_details.get("meanings", []),
         "pos_tags": pos_tagging(text),
         "tokens": word_tokenization(text),
         "lemmas": lemmatize_text(text)
@@ -223,27 +275,31 @@ def initialize_ml_models():
     
     return tf_model, pt_model, tokenizer
 
-def get_advanced_analysis(word: str) -> Dict:
+async def get_advanced_analysis(word: str) -> Dict:
     """Get advanced analysis using ML models"""
-    tf_model, pt_model, tokenizer = initialize_ml_models()
-    
-    # Basic analysis
-    basic_analysis = get_word_analysis(word)
-    
-    # PyTorch BERT analysis
-    inputs = tokenizer(word, return_tensors="pt", padding=True, truncation=True)
-    with torch.no_grad():
-        bert_output = pt_model(**inputs)
-    
-    # TensorFlow analysis
-    tf_output = tf_model.predict([word])
-    
-    # Combine all analyses
-    return {
-        **basic_analysis,
-        "bert_analysis": bert_output.logits.numpy().tolist(),
-        "tf_analysis": tf_output.tolist()
-    }
+    try:
+        # Get basic analysis
+        basic_analysis = await get_word_analysis(word)
+        
+        # Get ML analysis
+        bert_embeddings = ml_service.get_bert_embeddings(word)
+        sentiment = ml_service.get_sentiment(word)
+        tf_analysis = ml_service.get_tf_analysis(word)
+        
+        return {
+            **basic_analysis,
+            "ml_analysis": {
+                "bert_embeddings": bert_embeddings,
+                "sentiment": sentiment,
+                "tf_features": tf_analysis
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error in advanced analysis: {str(e)}")
+        return {
+            "error": str(e),
+            "basic_analysis": basic_analysis
+        }
 
 def translate_text(text: str, target_language: str = "hi"):
     return translator.translate(text, dest=target_language).text

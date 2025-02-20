@@ -82,3 +82,44 @@ h3 {
   font-size: 18px;
   color: #666;
 }
+
+.vector-section {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.vector-chart-container {
+  height: 300px;  /* Fixed height for the chart */
+  margin-bottom: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.vector-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.vector-value {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.dimension {
+  color: #666;
+  font-weight: bold;
+}
+
+.value {
+  color: #2c3e50;
+}

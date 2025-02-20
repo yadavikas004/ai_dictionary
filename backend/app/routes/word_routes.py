@@ -138,7 +138,7 @@ async def add_to_search_history(
 async def analyze_word(word: str):
     """Get complete word analysis"""
     try:
-        analysis = get_word_analysis(word)
+        analysis = await get_word_analysis(word)
         return analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -147,7 +147,7 @@ async def analyze_word(word: str):
 async def advanced_analysis(word: str):
     """Get advanced ML-based analysis"""
     try:
-        analysis = get_advanced_analysis(word)
+        analysis = await get_advanced_analysis(word)
         return analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
