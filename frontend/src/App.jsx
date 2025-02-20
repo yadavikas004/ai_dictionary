@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import api from './api/index';
 import SearchResults from './components/SearchResults';
 import Dictionary from './components/Dictionary';
@@ -8,6 +9,9 @@ import VoiceSearch from './components/VoiceSearch';
 import DownloadHistory from './components/DownloadHistory';
 import './App.css';
 import { searchWord } from './api/api';
+import Navbar from './components/Navbar';
+import WordAnalysis from './components/WordAnalysis';
+import { ThemeProvider } from './context/ThemeContext';
 
 function App() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,72 +58,24 @@ function App() {
   };
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>AI Dictionary</h1>
-        <p className="subtitle">Search for word meanings and definitions</p>
-      </header>
-
-      <main className="main-content">
-        <Dictionary updateSearchHistory={updateSearchHistory} />
-        <SearchHistory history={searchHistory} />
-        <SearchHistoryWithCounts />
-
-        {/* <div className="search-section">
-          <form onSubmit={handleSearch}>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={handleInputChange}
-              placeholder="Enter a word to search..."
-              className="search-input"
-              disabled={loading}
-            />
-            <button 
-              type="submit" 
-              className="search-button"
-              disabled={loading || !searchTerm.trim()}
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-          </form>
-        </div> */}
-
-        <VoiceSearch onSearch={handleVoiceSearch} />
-        <DownloadHistory />
-
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
-
-        {loading && (
-          <div className="loading-message">
-            Searching for meanings...
-          </div>
-        )}
-
-        {result && (
-          <div className="results-section">
-            <h2>Meanings:</h2>
-            <ul className="meanings-list">
-              {result.map((meaning, index) => (
-                <li key={index} className="meaning-item">
-                  {meaning}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <SearchResults word={searchTerm} result={result} />
-      </main>
-
-      <footer className="app-footer">
-        <p>© 2024 AI Dictionary. All rights reserved.</p>
-      </footer>
-    </div>
+    <ThemeProvider>
+      <Router>
+        <div className="app-container">
+          <Navbar />
+          <main className="main-content">
+            <Routes>
+              <Route path="/" element={<Dictionary />} />
+              <Route path="/analysis" element={<WordAnalysis />} />
+              <Route path="/history" element={<SearchHistory />} />
+              <Route path="/frequency" element={<SearchHistoryWithCounts />} />
+            </Routes>
+          </main>
+          <footer className="app-footer">
+            <p>© 2024 AI Dictionary. All rights reserved.</p>
+          </footer>
+        </div>
+      </Router>
+    </ThemeProvider>
   );
 }
 

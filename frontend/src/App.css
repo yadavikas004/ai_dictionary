@@ -228,6 +228,24 @@
   --danger-color: #dc3545;
   --light-color: #f8f9fa;
   --dark-color: #343a40;
+
+  /* Light theme */
+  --bg-primary-light: #ffffff;
+  --bg-secondary-light: #f8fafc;
+  --accent-light: #0ea5e9;
+  --text-primary-light: #1e293b;
+  --text-secondary-light: #64748b;
+  --border-light: #e2e8f0;
+  --accent-transparent-light: rgba(14, 165, 233, 0.1);
+
+  /* Dark theme */
+  --bg-primary-dark: #0f172a;
+  --bg-secondary-dark: #1e293b;
+  --accent-dark: #38bdf8;
+  --text-primary-dark: #f1f5f9;
+  --text-secondary-dark: #94a3b8;
+  --border-dark: #334155;
+  --accent-transparent-dark: rgba(56, 189, 248, 0.1);
 }
 
 body {
@@ -268,5 +286,68 @@ body {
   
   .main-content {
     padding: 0 0.5rem;
+  }
+}
+
+.app {
+  min-height: 100vh;
+  transition: all 0.3s ease;
+}
+
+/* Light theme */
+.app.light {
+  background-color: var(--bg-primary-light);
+  --bg-primary: var(--bg-primary-light);
+  --bg-secondary: var(--bg-secondary-light);
+  --text-primary: var(--text-primary-light);
+  --text-secondary: var(--text-secondary-light);
+  --accent: var(--accent-light);
+  --border: var(--border-light);
+  --accent-transparent: var(--accent-transparent-light);
+}
+
+/* Dark theme */
+.app.dark {
+  background-color: var(--bg-primary-dark);
+  --bg-primary: var(--bg-primary-dark);
+  --bg-secondary: var(--bg-secondary-dark);
+  --text-primary: var(--text-primary-dark);
+  --text-secondary: var(--text-secondary-dark);
+  --accent: var(--accent-dark);
+  --border: var(--border-dark);
+  --accent-transparent: var(--accent-transparent-dark);
+}
+
+.main-content {
+  padding-top: 100px;
+  min-height: calc(100vh - 100px);
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-left: 2rem;
+  padding-right: 2rem;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.app-footer {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }

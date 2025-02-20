@@ -27,7 +27,7 @@ const Dictionary = ({ updateSearchHistory }) => {
         updateSearchHistory(word);
       }
     } catch (err) {
-      setError(err.detail || 'An error occurred');
+      // setError(err.detail || 'An error occurred');
     } finally {
       setLoading(false);
     }
