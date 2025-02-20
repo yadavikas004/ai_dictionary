@@ -8,7 +8,8 @@ from app.services.word_service import (
     word_tokenization,
     word_lemmatization,
     get_word_analysis,
-    get_advanced_analysis
+    get_advanced_analysis,
+    store_word_data
 )
 from pydantic import BaseModel
 from typing import Dict, List
@@ -53,35 +54,30 @@ def get_word(word_text: str, db: Session = Depends(get_db)):
 
     return {"word": word.text, "meaning": word.meaning}
 
-@router.get("/meaning/{word}", response_model=Dict)
+@router.get("/meaning/{word}")
 async def get_word_meaning(
     word: str,
     db: Session = Depends(get_db)
 ):
-    """Get word meaning with AI analysis"""
-    logger.info(f"Received request for word: {word}")
+    """Get word meaning with database caching"""
     try:
-        # Get meanings and analysis
-        word_analysis = get_meaning(word)
-        
-        # Store in database
-        db_word = db.query(Word).filter(Word.text == word.lower()).first()
-        if not db_word:
-            meaning_text = " | ".join(word_analysis["meanings"])
-            db_word = Word(text=word.lower(), meaning=meaning_text)
-            db.add(db_word)
-            db.commit()
-            db.refresh(db_word)
+        word_data = await get_meaning(word, db)
         
         # Add to search history
+        db_word = await store_word_data(db, word, word_data)
+        
         history_entry = UserSearchHistory(word_id=db_word.id)
         db.add(history_entry)
         db.commit()
         
-        return word_analysis
+        return word_data
+        
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error processing word '{word}': {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing word: {str(e)}"
+        )
 
 @router.post("/pos-tagging/")
 def get_pos_tagging(text: str):
@@ -156,24 +152,21 @@ async def advanced_analysis(word: str):
 async def get_search_history(db: Session = Depends(get_db)):
     """Fetch all search words with their counts."""
     try:
-        # Fetch word IDs and their counts
         results = (
-            db.query(UserSearchHistory.word_id, func.count(UserSearchHistory.word_id).label('count'))
-            .group_by(UserSearchHistory.word_id)
+            db.query(UserSearchHistory.word_id, 
+                    Word.text.label('word'),
+                    UserSearchHistory.timestamp)
+            .join(Word)
+            .order_by(UserSearchHistory.timestamp.desc())
             .all()
         )
-
-        # Fetch the actual words based on word IDs
-        search_history = []
-        for word_id, count in results:
-            word = db.query(Word).filter(Word.id == word_id).first()
-            if word:
-                search_history.append({"word": word.text, "count": count})
-            else:
-                # Handle case where word is not found
-                search_history.append({"word": "Unknown", "count": count})
-
-        return search_history
-
+        
+        return [
+            {
+                "word": result.word,
+                "timestamp": result.timestamp.isoformat()  # Format as ISO 8601
+            }
+            for result in results
+        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

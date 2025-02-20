@@ -15,6 +15,9 @@ from fastapi import HTTPException
 from app.services.ml_service import MLService
 from app.services.nltk_setup import ensure_nltk_data
 import sys
+import json
+from sqlalchemy.orm import Session
+from app.models.word import Word
 
 # Configure logging
 logging.basicConfig(
@@ -60,7 +63,7 @@ embedding_model = tf.keras.Sequential([
     tf.keras.layers.GlobalAveragePooling1D()
 ])
 
-DICTIONARY_API_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
+DICTIONARY_API_URL = "https://api.dictionaryapi.dev/api/v2/entries/en"
 
 # Initialize ML Service
 ml_service = MLService()
@@ -94,26 +97,117 @@ async def get_word_details(word: str) -> Dict:
             detail=str(e)
         )
 
-def get_meaning(word: str) -> Dict:
-    """Get comprehensive word analysis"""
+def process_dictionary_response(data: List[Dict]) -> Dict:
+    """Process the dictionary API response"""
     try:
-        # Get basic meanings
-        meanings = get_dictionary_meaning(word)
-        
-        # Enhanced AI analysis
-        ai_analysis = {
-            "meanings": meanings,
-            "sentiment": analyze_sentiment(word),
-            "similar_words": find_similar_words(word),
-            "word_vector": get_word_vector(word),
-            "context_examples": generate_context(word)
+        if not data or not isinstance(data, list):
+            return {
+                "meanings": ["No definition found"],
+                "similar_words": [],
+                "context_examples": []
+            }
+
+        entry = data[0]
+        meanings = []
+        examples = []
+        similar_words = set()
+
+        for meaning in entry.get("meanings", []):
+            for definition in meaning.get("definitions", []):
+                if "definition" in definition:
+                    meanings.append(definition["definition"])
+                if "example" in definition:
+                    examples.append(definition["example"])
+            similar_words.update(meaning.get("synonyms", []))
+
+        return {
+            "meanings": meanings[:5],
+            "similar_words": list(similar_words)[:5],
+            "context_examples": examples[:3],
+            "phonetics": entry.get("phonetic", ""),
+            "source": "Dictionary API"
         }
+
+    except Exception as e:
+        logger.error(f"Error processing dictionary response: {str(e)}")
+        return {
+            "meanings": ["Error processing definition"],
+            "similar_words": [],
+            "context_examples": [],
+            "error": str(e)
+        }
+
+async def get_meaning(word: str, db: Session) -> Dict:
+    """Get word meaning with database caching"""
+    try:
+        # Check cache first
+        db_word = db.query(Word).filter(Word.text == word.lower()).first()
         
-        return ai_analysis
+        if db_word:
+            # Return cached data
+            return {
+                "meanings": json.loads(db_word.meaning),
+                "sentiment": {
+                    "score": db_word.sentiment_score,
+                    "label": "POSITIVE" if db_word.sentiment_score > 0.5 else "NEGATIVE"
+                },
+                "similar_words": json.loads(db_word.similar_words or '[]'),
+                "context_examples": json.loads(db_word.context_examples or '[]'),
+                "word_vector": json.loads(db_word.bert_embedding or '[]'),
+                "phonetics": db_word.phonetics,
+                "source": "cache"
+            }
+            
+        # If not in cache, fetch from API
+        word_data = await fetch_word_data(word)
+        
+        # Store in database
+        await store_word_data(db, word, word_data)
+        
+        return word_data
         
     except Exception as e:
-        logger.error(f"Error analyzing '{word}': {str(e)}")
-        return {"error": f"Unable to analyze: {word}"}
+        logger.error(f"Error in get_meaning: {str(e)}")
+        return await get_fallback_meaning(word)
+
+async def get_fallback_meaning(word: str) -> Dict:
+    """Fallback method for word meaning using WordNet"""
+    try:
+        synsets = wordnet.synsets(word)
+        
+        if synsets:
+            meanings = []
+            examples = []
+            similar_words = set()
+            
+            for synset in synsets[:3]:  # Take top 3 synsets
+                meanings.append(synset.definition())
+                if synset.examples():
+                    examples.extend(synset.examples()[:2])
+                similar_words.update([lemma.name() for lemma in synset.lemmas()])
+            
+            return {
+                "meanings": meanings,
+                "similar_words": list(similar_words)[:5],
+                "context_examples": examples[:3],
+                "source": "WordNet"
+            }
+        
+        return {
+            "meanings": ["No definition found"],
+            "similar_words": [],
+            "context_examples": [],
+            "source": "WordNet"
+        }
+        
+    except Exception as e:
+        logger.error(f"Fallback error for '{word}': {str(e)}")
+        return {
+            "meanings": ["Unable to fetch meaning"],
+            "similar_words": [],
+            "context_examples": [],
+            "error": str(e)
+        }
 
 def get_dictionary_meaning(word: str) -> List[str]:
     """Get dictionary meanings"""
@@ -303,3 +397,76 @@ async def get_advanced_analysis(word: str) -> Dict:
 
 def translate_text(text: str, target_language: str = "hi"):
     return translator.translate(text, dest=target_language).text
+
+async def store_word_data(db: Session, word: str, word_data: dict) -> Word:
+    """Store word data in database"""
+    try:
+        # Check if word exists
+        db_word = db.query(Word).filter(Word.text == word.lower()).first()
+        
+        # Prepare word data
+        word_dict = {
+            'text': word.lower(),
+            'meaning': json.dumps(word_data.get('meanings', [])),
+            'bert_embedding': json.dumps(word_data.get('word_vector', [])),
+            'sentiment_score': word_data.get('sentiment', {}).get('score'),
+            'similar_words': json.dumps(word_data.get('similar_words', [])),
+            'context_examples': json.dumps(word_data.get('context_examples', [])),
+            'phonetics': word_data.get('phonetics', '')
+        }
+        
+        if db_word:
+            # Update existing word
+            for key, value in word_dict.items():
+                setattr(db_word, key, value)
+        else:
+            # Create new word
+            db_word = Word(**word_dict)
+            db.add(db_word)
+            
+        db.commit()
+        db.refresh(db_word)
+        return db_word
+        
+    except Exception as e:
+        logger.error(f"Database error while storing word data: {str(e)}")
+        db.rollback()
+        raise
+
+async def fetch_word_data(word: str) -> Dict:
+    """Fetch word data from dictionary API and enrich with ML features"""
+    try:
+        # Initialize ML service
+        ml_service = MLService()
+        
+        # Fetch from dictionary API
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{DICTIONARY_API_URL}/{word}") as response:
+                if response.status == 200:
+                    api_data = await response.json()
+                    processed_data = process_dictionary_response(api_data)
+                else:
+                    # Use fallback if API fails
+                    processed_data = await get_fallback_meaning(word)
+
+        # Enrich with sentiment analysis
+        sentiment = ml_service.get_sentiment(word)
+        
+        # Get word vector (BERT embedding)
+        word_vector = ml_service.get_word_embedding(word)
+        
+        # Combine all data
+        return {
+            "meanings": processed_data.get("meanings", []),
+            "similar_words": processed_data.get("similar_words", []),
+            "context_examples": processed_data.get("context_examples", []),
+            "phonetics": processed_data.get("phonetics", ""),
+            "sentiment": sentiment,
+            "word_vector": word_vector.tolist() if word_vector is not None else [],
+            "source": processed_data.get("source", "combined")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching word data: {str(e)}")
+        # Use fallback on error
+        return await get_fallback_meaning(word)

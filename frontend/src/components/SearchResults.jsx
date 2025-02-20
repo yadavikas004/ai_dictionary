@@ -25,7 +25,7 @@ const SearchResults = ({ word, result }) => {
   console.log('Search Results:', result);
 
   if (!result) {
-    return <div className="loading">Loading...</div>;
+    return <div className="loading"></div>;
   }
 
   // Helper function for sentiment color
