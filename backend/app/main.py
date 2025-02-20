@@ -2,17 +2,13 @@ from http.client import HTTPException
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import word_routes
-from app.database import engine, Base, get_db, init_db
+from app.database import get_db, init_db
 from app.services.ml_service import MLService
 import logging
 import os
 import warnings
 from dotenv import load_dotenv
-from fastapi.responses import StreamingResponse
-import csv
-from io import StringIO
 from sqlalchemy.orm import Session
-from .models import UserSearchHistory  # Assuming you have a model for search history
 import sys
 import nltk
 from contextlib import asynccontextmanager
@@ -40,75 +36,62 @@ logger = logging.getLogger(__name__)
 # Global ML Service instance
 ml_service = None
 
-def download_nltk_data():
-    """Download required NLTK data"""
+def setup_nltk():
+    """Set up NLTK data"""
     try:
-        # Set NLTK data path to current directory
+        # Set NLTK data path
         current_dir = Path(__file__).parent.parent
         nltk_data_dir = current_dir / 'nltk_data'
         nltk_data_dir.mkdir(exist_ok=True)
-        
-        # Set NLTK data path
         nltk.data.path.append(str(nltk_data_dir))
         
-        # Required NLTK packages
-        required_packages = [
-            'punkt',
-            'averaged_perceptron_tagger',
-            'wordnet'
-        ]
-        
         # Download required packages
-        for package in required_packages:
+        packages = ['punkt', 'averaged_perceptron_tagger', 'wordnet']
+        for package in packages:
             try:
-                logger.info(f"Downloading NLTK package: {package}")
                 nltk.download(package, download_dir=str(nltk_data_dir), quiet=True)
-                logger.info(f"Successfully downloaded {package}")
-            except Exception as e:
-                logger.error(f"Error downloading {package}: {str(e)}")
-                raise
-                
-        logger.info("All NLTK packages downloaded successfully")
-        
+            except Exception:
+                pass  # Skip if already downloaded
     except Exception as e:
-        logger.error(f"Error downloading NLTK data: {str(e)}")
-        raise
+        logger.error(f"NLTK setup error: {str(e)}")
+        return False
+    return True
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application"""
     # Startup
     try:
-        logger.info("Application starting up...")
+        logger.info("Initializing application...")
         
         # Initialize database
-        logger.info("Initializing database...")
         init_db()
         
-        # Download NLTK data
-        logger.info("Downloading NLTK data...")
-        download_nltk_data()
+        # Setup NLTK
+        setup_nltk()
         
         # Initialize ML Service
-        logger.info("Initializing ML Service...")
         global ml_service
         ml_service = MLService()
-        logger.info("ML Service initialized successfully!")
+        
+        logger.info("Application initialized successfully!")
         
     except Exception as e:
         logger.error(f"Startup error: {str(e)}")
         raise
     
-    yield  # Server is running
+    yield  # Application is running
     
     # Shutdown
     try:
-        logger.info("Application shutting down gracefully...")
+        logger.info("Shutting down application...")
         # Cleanup code here if needed
+        if ml_service:
+            del ml_service
     except Exception as e:
-        logger.error(f"Error during shutdown: {str(e)}")
+        logger.error(f"Shutdown error: {str(e)}")
 
-# Create FastAPI app with lifespan
+# Create FastAPI app with lifespan manager
 app = FastAPI(
     title="AI Dictionary API",
     lifespan=lifespan
@@ -117,7 +100,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Add your frontend URLs
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -132,7 +115,7 @@ app.include_router(
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Root endpoint"""
     return {
         "status": "healthy",
         "ml_service": "initialized" if ml_service and ml_service._initialized else "not initialized"
@@ -140,19 +123,13 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check endpoint"""
+    """Health check endpoint"""
     try:
-        # Check NLTK data
-        nltk_status = all(
-            nltk.data.find(f'tokenizers/{pkg}') 
-            for pkg in ['punkt', 'averaged_perceptron_tagger', 'wordnet']
-        )
-        
         return {
             "status": "healthy",
             "database": "connected",
             "ml_service": bool(ml_service and ml_service._initialized),
-            "nltk_data": "downloaded" if nltk_status else "missing"
+            "nltk_data": "downloaded" if setup_nltk() else "missing"
         }
     except Exception as e:
         logger.error(f"Health check error: {str(e)}")
@@ -191,8 +168,8 @@ async def download_history(db: Session = Depends(get_db)):
             detail=f"Error fetching search history: {str(e)}"
         )
 
-# Error handlers
+# Error handler for graceful shutdown
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    logger.error(f"Global exception handler: {str(exc)}")
-    return {"detail": str(exc)}, 500
+    logger.error(f"Global exception: {str(exc)}")
+    return {"detail": "Internal server error"}, 500

@@ -1,75 +1,140 @@
+/* Common styles */
+.search-history-container,
 .search-history {
   padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin: 20px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.search-history h2 {
-  color: #333;
+h2 {
+  color: #2c3e50;
   margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #eee;
 }
 
-.history-list {
+/* History list styles */
+.history-list,
+.frequency-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
-.history-item {
+.history-item,
+.frequency-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  transition: background-color 0.2s;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: transform 0.2s;
 }
 
-.history-item:hover {
-  background: #e9ecef;
+.history-item:hover,
+.frequency-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
+/* Word styles */
 .word {
-  font-weight: 500;
+  font-weight: 600;
   color: #2c3e50;
+  flex: 1;
 }
 
+/* Count and badge styles */
+.count,
+.frequency-badge {
+  background-color: #007bff;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  margin: 0 10px;
+}
+
+/* Timestamp styles */
 .timestamp {
   color: #6c757d;
   font-size: 0.9em;
+  min-width: 200px;
+  text-align: right;
 }
 
+/* Button styles */
+.refresh-button {
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: background-color 0.3s;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.refresh-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Status message styles */
+.loading,
+.error-message,
+.no-data {
+  text-align: center;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.loading {
+  color: #666;
+  background-color: #f8f9fa;
+}
+
+.error-message {
+  color: #dc3545;
+  background-color: #f8d7da;
+}
+
+.no-data {
+  color: #666;
+  font-style: italic;
+  background-color: #f8f9fa;
+}
+
+/* Pagination styles */
 .pagination {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 15px;
   margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
 }
 
 .pagination button {
   padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
   border: none;
   border-radius: 4px;
-  background: #007bff;
-  color: white;
   cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.pagination button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+  transition: background-color 0.3s;
 }
 
 .pagination button:hover:not(:disabled) {
-  background: #0056b3;
+  background-color: #0056b3;
+}
+
+.pagination button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 .page-info {

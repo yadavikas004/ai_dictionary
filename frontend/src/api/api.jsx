@@ -8,27 +8,33 @@ const api = axios.create({
     "Content-Type": "application/json",
     "Accept": "application/json",
   },
-  timeout: 15000,
-  withCredentials: true
+  timeout: 10000,
 });
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API Error:', error);
+    if (error.response) {
+      // Server responded with error
+      throw new Error(error.response.data.detail || 'An error occurred');
+    } else if (error.request) {
+      // Request made but no response
+      throw new Error('No response from server');
+    } else {
+      // Error setting up request
+      throw new Error('Error setting up request');
+    }
+  }
+);
 
 export const searchWord = async (word) => {
   try {
     const response = await api.get(`/meaning/${word}`);
     return response.data;
   } catch (error) {
-    console.error('API Error:', error);
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      throw new Error(error.response.data.detail || 'Failed to fetch word meaning');
-    } else if (error.request) {
-      // The request was made but no response was received
-      throw new Error('No response from server. Please check your connection.');
-    } else {
-      // Something happened in setting up the request
-      throw new Error('Error setting up the request');
-    }
+    throw error;
   }
 };
 
@@ -37,16 +43,15 @@ export const getSearchHistory = async () => {
     const response = await api.get('/search-history');
     return response.data;
   } catch (error) {
-    console.error('History Error:', error);
-    throw new Error('Failed to fetch search history');
+    throw error;
   }
 };
 
 export const getSearchHistoryWithCounts = async () => {
   try {
-    const response = await api.get(`/search-history`);
+    const response = await api.get('/search-history/counts');
     return response.data;
   } catch (error) {
-    throw error.response?.data || { detail: 'Failed to fetch search history' };
+    throw error;
   }
 };
