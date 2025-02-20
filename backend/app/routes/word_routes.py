@@ -9,7 +9,8 @@ from app.services.word_service import (
     word_lemmatization,
     get_word_analysis,
     get_advanced_analysis,
-    store_word_data
+    store_word_data,
+    get_positive_words
 )
 from pydantic import BaseModel
 from typing import Dict, List
@@ -252,4 +253,23 @@ async def add_to_history(word_id: int, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail="Failed to add to history"
+        )
+
+@router.get("/positive-words")
+async def get_positive_words_analysis():
+    """Get analysis of positive words"""
+    try:
+        positive_words = await get_positive_words()
+        return {
+            "status": "success",
+            "count": len(positive_words),
+            "words": positive_words
+        }
+    except HTTPException as http_error:
+        raise http_error
+    except Exception as e:
+        logger.error(f"Error in positive words endpoint: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
         )

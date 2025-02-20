@@ -77,3 +77,13 @@ export const getAdvancedAnalysis = async (word) => {
     throw error;
   }
 };
+
+export const getPositiveWords = async () => {
+  try {
+    const response = await api.get('/positive-words');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching positive words:', error);
+    throw error;
+  }
+};

@@ -470,3 +470,49 @@ async def fetch_word_data(word: str) -> Dict:
         logger.error(f"Error fetching word data: {str(e)}")
         # Use fallback on error
         return await get_fallback_meaning(word)
+
+async def get_positive_words() -> List[Dict]:
+    """Get a list of positive words with their analysis"""
+    try:
+        # Common positive words
+        positive_words = [
+            "happy", "joy", "love", "peace", "wonderful",
+            "excellent", "amazing", "beautiful", "success",
+            "hope", "kindness", "gratitude", "courage", "inspire"
+        ]
+        
+        ml_service = MLService()
+        results = []
+        
+        for word in positive_words:
+            try:
+                # Get sentiment analysis
+                sentiment = ml_service.get_sentiment(word)
+                
+                # Get word embedding
+                embedding = ml_service.get_word_embedding(word)
+                
+                # Get similar words
+                similar = ml_service.get_similar_words(word, n=3)
+                
+                results.append({
+                    "word": word,
+                    "sentiment": sentiment,
+                    "similar_words": similar,
+                    "score": sentiment.get("score", 0)
+                })
+                
+            except Exception as word_error:
+                logger.error(f"Error analyzing word {word}: {str(word_error)}")
+                continue
+        
+        # Sort by sentiment score
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error getting positive words: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting positive words: {str(e)}"
+        )
